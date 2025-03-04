@@ -1,4 +1,5 @@
 pub mod dx12;
+pub mod vulkan;
 
 #[async_std::test]
 async fn dx12() {
