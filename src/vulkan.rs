@@ -1,14 +1,10 @@
 use ash::{khr, vk};
-use oidn::sys::{
-    OIDNError_OIDN_ERROR_NONE,
-    OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32, oidnGetDeviceError,
-};
-use std::ffi::{CStr, c_char};
+use oidn::sys::OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32;
 use std::ptr;
 use wgpu::hal::api::Vulkan;
 use wgpu::hal::{CommandEncoder, vulkan};
 use wgpu::util::align_to;
-use wgpu::{BufferDescriptor, BufferUsages, DeviceDescriptor, RequestDeviceError};
+use wgpu::{BufferDescriptor, BufferUsages, DeviceDescriptor};
 use windows::Win32::Foundation::GENERIC_ALL;
 
 pub struct VulkanAllocation {
@@ -32,7 +28,7 @@ impl crate::Device {
         adapter: &wgpu::Adapter,
         desc: &DeviceDescriptor<'_>,
         trace_path: Option<&std::path::Path>,
-    ) -> Result<(Self, wgpu::Queue), Option<RequestDeviceError>> {
+    ) -> Result<(Self, wgpu::Queue), crate::DeviceCreateError> {
         // # SAFETY: the raw handle is not manually destroyed.
         let adapter_vulkan_desc = unsafe {
             adapter.as_hal::<Vulkan, _, _>(|adapter| {
@@ -60,24 +56,22 @@ impl crate::Device {
             })
         };
         let Some(vk_desc) = adapter_vulkan_desc else {
-            return Err(None);
+            return Err(crate::DeviceCreateError::MissingFeature);
         };
         let device = unsafe {
             oidn::sys::oidnNewDeviceByUUID((&vk_desc.device_uuid) as *const _ as *const _)
         };
         if device.is_null() {
-            let mut err_msg = ptr::null();
-            let err = unsafe { oidnGetDeviceError(device, &mut err_msg as *mut *const c_char) };
-            if OIDNError_OIDN_ERROR_NONE != err {
-                let msg = unsafe { CStr::from_ptr(err_msg).to_string_lossy().to_string() };
-                panic!("{}", msg);
-            }
+            return Err(crate::DeviceCreateError::OidnUnsupported);
         }
         let oidn_device = unsafe {
             oidn::sys::oidnCommitDevice(device);
             oidn::Device::from_raw(device)
         };
-        let (wgpu_device, queue) = adapter.request_device(desc, trace_path).await?;
+        let (wgpu_device, queue) = adapter
+            .request_device(desc, trace_path)
+            .await
+            .map_err(|err| crate::DeviceCreateError::RequestDeviceError(err))?;
         Ok((
             crate::Device {
                 wgpu_device,
@@ -107,9 +101,7 @@ impl crate::Device {
                 );
                 let vk_info = vk::BufferCreateInfo::default()
                     .size(size)
-                    .usage(
-                        vk::BufferUsageFlags::TRANSFER_SRC | vk::BufferUsageFlags::TRANSFER_DST,
-                    )
+                    .usage(vk::BufferUsageFlags::TRANSFER_SRC | vk::BufferUsageFlags::TRANSFER_DST)
                     .sharing_mode(vk::SharingMode::CONCURRENT);
 
                 let raw_buffer = device
@@ -186,7 +178,7 @@ impl crate::Device {
                     size as usize,
                 );
                 if oidn_buffer.is_null() {
-                    eprintln!("Failed to create oidn buffer", );
+                    eprintln!("Failed to create oidn buffer",);
                     eprintln!("error: {:?}", self.oidn_device.get_error());
                     return Err(None);
                 }
@@ -208,10 +200,10 @@ impl crate::Device {
                 Ok(crate::SharedBuffer {
                     _allocation: crate::Allocation::Vulkan {
                         _vulkan: VulkanAllocation {
-                        memory,
-                        wgpu_device: self.wgpu_device.clone(),
-                    }
-                },
+                            memory,
+                            wgpu_device: self.wgpu_device.clone(),
+                        },
+                    },
                     wgpu_buffer,
                     oidn_buffer: self.oidn_device.create_buffer_from_raw(oidn_buffer),
                 })

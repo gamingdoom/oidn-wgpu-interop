@@ -1,5 +1,31 @@
+use std::fmt::Debug;
+
 pub mod dx12;
 pub mod vulkan;
+
+pub enum DeviceCreateError {
+    RequestDeviceError(wgpu::RequestDeviceError),
+    OidnUnsupported,
+    MissingFeature,
+    UnsupportedBackend(wgpu::Backend),
+}
+
+impl Debug for DeviceCreateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            DeviceCreateError::RequestDeviceError(err) => err.fmt(f),
+            DeviceCreateError::OidnUnsupported => f.write_str(
+                "OIDN could not create a device for this Adapter (does this adapter support OIDN?)",
+            ),
+            DeviceCreateError::MissingFeature => f.write_str("A required feature is missing"),
+            DeviceCreateError::UnsupportedBackend(backend) => {
+                f.write_str("The backend ")?;
+                backend.fmt(f)?;
+                f.write_str(" is not supported.")
+            }
+        }
+    }
+}
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 enum Backend {
@@ -19,25 +45,22 @@ impl Device {
         adapter: &wgpu::Adapter,
         desc: &wgpu::DeviceDescriptor<'_>,
         trace_path: Option<&std::path::Path>,
-    ) -> Result<(Self, wgpu::Queue), Option<wgpu::RequestDeviceError>> {
+    ) -> Result<(Self, wgpu::Queue), DeviceCreateError> {
         match adapter.get_info().backend {
-            wgpu::Backend::Vulkan => {
-                Self::new_vulkan(adapter, desc, trace_path).await
-            }
-            wgpu::Backend::Dx12 => {
-                Self::new_dx12(adapter, desc, trace_path).await
-            }
-            _ => Err(None),
+            wgpu::Backend::Vulkan => Self::new_vulkan(adapter, desc, trace_path).await,
+            wgpu::Backend::Dx12 => Self::new_dx12(adapter, desc, trace_path).await,
+            _ => Err(DeviceCreateError::UnsupportedBackend(
+                adapter.get_info().backend,
+            )),
         }
     }
-    pub fn allocate_shared_buffers(&self, size: wgpu::BufferAddress) -> Result<SharedBuffer, Option<()>> {
+    pub fn allocate_shared_buffers(
+        &self,
+        size: wgpu::BufferAddress,
+    ) -> Result<SharedBuffer, Option<()>> {
         match self.backend {
-            Backend::Dx12 => {
-                self.allocate_shared_buffers_dx12(size)
-            }
-            Backend::Vulkan => {
-                self.allocate_shared_buffers_vulkan(size)
-            }
+            Backend::Dx12 => self.allocate_shared_buffers_dx12(size),
+            Backend::Vulkan => self.allocate_shared_buffers_vulkan(size),
         }
     }
     pub fn oidn_device(&self) -> &oidn::Device {
@@ -80,8 +103,7 @@ async fn test() {
         backends: wgpu::Backends::DX12 | wgpu::Backends::VULKAN,
         ..Default::default()
     });
-    let adapters = instance
-        .enumerate_adapters(wgpu::Backends::all());
+    let adapters = instance.enumerate_adapters(wgpu::Backends::all());
     for adapter in adapters {
         match adapter.get_info().backend {
             wgpu::Backend::Vulkan => {
@@ -92,11 +114,15 @@ async fn test() {
             }
             _ => continue,
         }
-        let Ok((device, queue)) = Device::new(&adapter, &wgpu::DeviceDescriptor::default(), None)
-            .await else {
-            eprintln!("Failed to create device {} (is oidn not supported on it?)", adapter.get_info().name);
-            continue;
-        };
+        let (device, queue) =
+            match Device::new(&adapter, &wgpu::DeviceDescriptor::default(), None).await {
+                Ok((device, queue)) => (device, queue),
+                Err(err) => {
+                    eprintln!("Device creation failed");
+                    eprintln!("    {err:?}");
+                    continue;
+                }
+            };
         let mut bufs = device
             .allocate_shared_buffers(size_of::<[f32; 4]>() as wgpu::BufferAddress)
             .unwrap();

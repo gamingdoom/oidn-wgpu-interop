@@ -2,7 +2,7 @@ use oidn::sys::OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_
 use std::ptr;
 use wgpu::hal::api::Dx12;
 use wgpu::hal::{CommandEncoder, dx12};
-use wgpu::{BufferDescriptor, BufferUsages, DeviceDescriptor, RequestDeviceError};
+use wgpu::{BufferDescriptor, BufferUsages, DeviceDescriptor};
 use windows::Win32::Foundation::GENERIC_ALL;
 use windows::Win32::Graphics::Direct3D12::{
     D3D12_CPU_PAGE_PROPERTY_NOT_AVAILABLE, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT,
@@ -22,7 +22,7 @@ impl crate::Device {
         adapter: &wgpu::Adapter,
         desc: &DeviceDescriptor<'_>,
         trace_path: Option<&std::path::Path>,
-    ) -> Result<(Self, wgpu::Queue), Option<RequestDeviceError>> {
+    ) -> Result<(Self, wgpu::Queue), crate::DeviceCreateError> {
         // # SAFETY: the raw handle is not manually destroyed.
         let adapter_dx12_desc = unsafe {
             adapter.as_hal::<Dx12, _, _>(|adapter| {
@@ -30,15 +30,20 @@ impl crate::Device {
             })
         };
         let Some(dx_desc) = adapter_dx12_desc else {
-            return Err(None);
+            return Err(crate::DeviceCreateError::UnsupportedBackend(
+                adapter.get_info().backend,
+            ));
         };
         let device = unsafe {
             oidn::sys::oidnNewDeviceByLUID((&dx_desc.AdapterLuid) as *const _ as *const _)
         };
         if device.is_null() {
-            return Err(None);
+            return Err(crate::DeviceCreateError::OidnUnsupported);
         }
-        let (wgpu_device, queue) = adapter.request_device(desc, trace_path).await?;
+        let (wgpu_device, queue) = adapter
+            .request_device(desc, trace_path)
+            .await
+            .map_err(|err| crate::DeviceCreateError::RequestDeviceError(err))?;
         let oidn_device = unsafe {
             oidn::sys::oidnCommitDevice(device);
             oidn::Device::from_raw(device)
@@ -118,10 +123,7 @@ impl crate::Device {
                         &mut resource,
                     )
                     .map_err(|err| {
-                        eprintln!(
-                            "Failed to create resource: {}",
-                            err.message()
-                        );
+                        eprintln!("Failed to create resource: {}", err.message());
                         None
                     })?;
                 let resource = resource.unwrap();
@@ -161,10 +163,8 @@ impl crate::Device {
                 );
                 Ok(crate::SharedBuffer {
                     _allocation: crate::Allocation::Dx12 {
-                        _dx12: Dx12Allocation {
-                        _heap: heap,
-                    }
-                },
+                        _dx12: Dx12Allocation { _heap: heap },
+                    },
                     wgpu_buffer,
                     oidn_buffer: self.oidn_device.create_buffer_from_raw(oidn_buffer),
                 })
