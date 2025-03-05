@@ -40,7 +40,9 @@ impl crate::Device {
                     .and_then(|adapter| {
                         (adapter
                             .physical_device_capabilities()
-                            .supports_extension(khr::external_memory_win32::NAME))
+                            .supports_extension(khr::external_memory_win32::NAME)
+                            // `get_physical_device_properties2` requires version >= 1.1
+                        && adapter.shared_instance().raw_instance().get_physical_device_properties(adapter.raw_physical_device()).api_version >= vk::API_VERSION_1_1)
                         .then_some(adapter)
                     })
                     .map(|adapter| {
