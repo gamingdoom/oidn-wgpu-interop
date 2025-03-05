@@ -7,7 +7,7 @@ use wgpu::util::align_to;
 use wgpu::{BufferDescriptor, BufferUsages, DeviceDescriptor};
 use windows::Win32::Foundation::GENERIC_ALL;
 
-pub struct VulkanAllocation {
+pub(crate) struct VulkanAllocation {
     memory: vk::DeviceMemory,
     wgpu_device: wgpu::Device,
 }
@@ -24,7 +24,7 @@ impl Drop for VulkanAllocation {
 }
 
 impl crate::Device {
-    pub async fn new_vulkan(
+    pub(crate) async fn new_vulkan(
         adapter: &wgpu::Adapter,
         desc: &DeviceDescriptor<'_>,
         trace_path: Option<&std::path::Path>,
@@ -82,7 +82,7 @@ impl crate::Device {
             queue,
         ))
     }
-    pub fn allocate_shared_buffers_vulkan(
+    pub(crate) fn allocate_shared_buffers_vulkan(
         &self,
         size: wgpu::BufferAddress,
     ) -> Result<crate::SharedBuffer, Option<()>> {

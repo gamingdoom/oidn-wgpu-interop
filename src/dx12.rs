@@ -13,12 +13,12 @@ use windows::Win32::Graphics::Direct3D12::{
 };
 use windows::Win32::Graphics::Dxgi::Common::{DXGI_FORMAT_UNKNOWN, DXGI_SAMPLE_DESC};
 
-pub struct Dx12Allocation {
+pub(crate) struct Dx12Allocation {
     _heap: ID3D12Heap,
 }
 
 impl crate::Device {
-    pub async fn new_dx12(
+    pub(crate) async fn new_dx12(
         adapter: &wgpu::Adapter,
         desc: &DeviceDescriptor<'_>,
         trace_path: Option<&std::path::Path>,
@@ -58,7 +58,7 @@ impl crate::Device {
             queue,
         ))
     }
-    pub fn allocate_shared_buffers_dx12(
+    pub(crate) fn allocate_shared_buffers_dx12(
         &self,
         size: wgpu::BufferAddress,
     ) -> Result<crate::SharedBuffer, Option<()>> {
