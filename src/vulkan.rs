@@ -11,20 +11,12 @@ use wgpu::util::align_to;
 use wgpu::{BufferDescriptor, BufferUsages, DeviceDescriptor, RequestDeviceError};
 use windows::Win32::Foundation::GENERIC_ALL;
 
-pub struct VulkanDevice {
-    wgpu_device: wgpu::Device,
-    oidn_device: oidn::Device,
-    queue: wgpu::Queue,
-}
-
-pub struct VulkanBuffer {
+pub struct VulkanAllocation {
     memory: vk::DeviceMemory,
     wgpu_device: wgpu::Device,
-    oidn_buffer: oidn::Buffer,
-    wgpu_buffer: wgpu::Buffer,
 }
 
-impl Drop for VulkanBuffer {
+impl Drop for VulkanAllocation {
     fn drop(&mut self) {
         unsafe {
             self.wgpu_device.as_hal::<Vulkan, _, _>(|device| {
@@ -35,8 +27,8 @@ impl Drop for VulkanBuffer {
     }
 }
 
-impl VulkanDevice {
-    pub async fn new(
+impl crate::Device {
+    pub async fn new_vulkan(
         adapter: &wgpu::Adapter,
         desc: &DeviceDescriptor<'_>,
         trace_path: Option<&std::path::Path>,
@@ -85,23 +77,25 @@ impl VulkanDevice {
         };
         let (wgpu_device, queue) = adapter.request_device(desc, trace_path).await?;
         Ok((
-            VulkanDevice {
+            crate::Device {
                 wgpu_device,
                 oidn_device,
                 queue: queue.clone(),
+                backend: crate::Backend::Vulkan,
             },
             queue,
         ))
     }
-    pub fn allocate_buffers(
+    pub fn allocate_shared_buffers_vulkan(
         &self,
         size: wgpu::BufferAddress,
-        count: u8,
-    ) -> Result<Vec<VulkanBuffer>, Option<()>> {
-        let mut buffers = Vec::with_capacity(count as usize);
-        if size == 0 || count == 0 {
+    ) -> Result<crate::SharedBuffer, Option<()>> {
+        assert_eq!(self.backend, crate::Backend::Vulkan);
+
+        if size == 0 {
             return Err(None);
         }
+
         unsafe {
             self.wgpu_device.as_hal::<Vulkan, _, _>(|device| {
                 let device = device.unwrap();
@@ -109,143 +103,117 @@ impl VulkanDevice {
                     device.shared_instance().raw_instance(),
                     device.raw_device(),
                 );
-                for i in 0..count {
-                    let vk_info = vk::BufferCreateInfo::default()
-                        .size(size)
-                        .usage(
-                            vk::BufferUsageFlags::TRANSFER_SRC | vk::BufferUsageFlags::TRANSFER_DST,
-                        )
-                        .sharing_mode(vk::SharingMode::CONCURRENT);
+                let vk_info = vk::BufferCreateInfo::default()
+                    .size(size)
+                    .usage(
+                        vk::BufferUsageFlags::TRANSFER_SRC | vk::BufferUsageFlags::TRANSFER_DST,
+                    )
+                    .sharing_mode(vk::SharingMode::CONCURRENT);
 
-                    let raw_buffer = unsafe {
-                        device
-                            .raw_device()
-                            .create_buffer(&vk_info, None)
-                            .map_err(|_| None)?
-                    };
+                let raw_buffer = device
+                    .raw_device()
+                    .create_buffer(&vk_info, None)
+                    .map_err(|_| None)?;
 
-                    let req = unsafe {
-                        device
-                            .raw_device()
-                            .get_buffer_memory_requirements(raw_buffer)
-                    };
-                    let size = align_to(size, req.alignment);
+                let req = device
+                    .raw_device()
+                    .get_buffer_memory_requirements(raw_buffer);
 
-                    let mem_properties = unsafe {
-                        device
-                            .shared_instance()
-                            .raw_instance()
-                            .get_physical_device_memory_properties(device.raw_physical_device())
-                    };
+                let size = align_to(size, req.alignment);
 
-                    let mut idx = None;
+                let mem_properties = device
+                    .shared_instance()
+                    .raw_instance()
+                    .get_physical_device_memory_properties(device.raw_physical_device());
 
-                    let flags = vk::MemoryPropertyFlags::DEVICE_LOCAL;
+                let mut idx = None;
 
-                    for (i, mem_ty) in mem_properties.memory_types_as_slice().iter().enumerate() {
-                        let types_bits = 1 << i;
-                        let is_required_memory_type = req.memory_type_bits & types_bits != 0;
-                        let has_required_properties = mem_ty.property_flags & flags == flags;
-                        if is_required_memory_type && has_required_properties {
-                            idx = Some(i);
-                            break;
-                        }
+                let flags = vk::MemoryPropertyFlags::DEVICE_LOCAL;
+
+                for (i, mem_ty) in mem_properties.memory_types_as_slice().iter().enumerate() {
+                    let types_bits = 1 << i;
+                    let is_required_memory_type = req.memory_type_bits & types_bits != 0;
+                    let has_required_properties = mem_ty.property_flags & flags == flags;
+                    if is_required_memory_type && has_required_properties {
+                        idx = Some(i);
+                        break;
                     }
+                }
 
-                    let Some(idx) = idx else {
-                        return Err(None);
-                    };
+                let Some(idx) = idx else {
+                    return Err(None);
+                };
 
-                    let mut info = vk::MemoryAllocateInfo::default()
-                        .allocation_size(size)
-                        .memory_type_index(idx as u32);
+                let mut info = vk::MemoryAllocateInfo::default()
+                    .allocation_size(size)
+                    .memory_type_index(idx as u32);
 
-                    let mut export_alloc_info = vk::ExportMemoryAllocateInfo::default()
-                        .handle_types(vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32_KHR);
+                let mut export_alloc_info = vk::ExportMemoryAllocateInfo::default()
+                    .handle_types(vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32_KHR);
 
-                    let mut win32_info =
-                        vk::ExportMemoryWin32HandleInfoKHR::default().dw_access(GENERIC_ALL.0);
+                let mut win32_info =
+                    vk::ExportMemoryWin32HandleInfoKHR::default().dw_access(GENERIC_ALL.0);
 
-                    info = info
-                        .push_next(&mut win32_info)
-                        .push_next(&mut export_alloc_info);
+                info = info
+                    .push_next(&mut win32_info)
+                    .push_next(&mut export_alloc_info);
 
-                    let memory = match unsafe { device.raw_device().allocate_memory(&info, None) } {
-                        Ok(memory) => memory,
-                        Err(_) => return Err(None),
-                    };
+                let memory = match device.raw_device().allocate_memory(&info, None) {
+                    Ok(memory) => memory,
+                    Err(_) => return Err(None),
+                };
 
-                    unsafe {
-                        device
-                            .raw_device()
-                            .bind_buffer_memory(raw_buffer, memory, 0)
-                            .map_err(|_| None)?
-                    };
+                device
+                    .raw_device()
+                    .bind_buffer_memory(raw_buffer, memory, 0)
+                    .map_err(|_| None)?;
 
-                    let handle = win_32_funcs
-                        .get_memory_win32_handle(
-                            &vk::MemoryGetWin32HandleInfoKHR::default()
-                                .memory(memory)
-                                .handle_type(vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32_KHR),
-                        )
-                        .map_err(|_| None)?;
+                let handle = win_32_funcs
+                    .get_memory_win32_handle(
+                        &vk::MemoryGetWin32HandleInfoKHR::default()
+                            .memory(memory)
+                            .handle_type(vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32_KHR),
+                    )
+                    .map_err(|_| None)?;
 
-                    let oidn_buffer = oidn::sys::oidnNewSharedBufferFromWin32Handle(
-                        self.oidn_device.raw(),
-                        OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32,
-                        handle as *mut _,
-                        ptr::null(),
-                        size as usize,
-                    );
-                    if oidn_buffer.is_null() {
-                        eprintln!("Failed to create oidn buffer number {}", i + 1);
-                        eprintln!("error: {:?}", self.oidn_device.get_error());
-                        return Err(None);
-                    }
-                    let buf = vulkan::Device::buffer_from_raw(raw_buffer);
-                    let mut encoder = self.wgpu_device.create_command_encoder(&Default::default());
-                    encoder.as_hal_mut::<Vulkan, _, _>(|encoder| {
-                        encoder.unwrap().clear_buffer(&buf, 0..size);
-                    });
-                    self.queue.submit([encoder.finish()]);
-                    let wgpu_buffer = self.wgpu_device.create_buffer_from_hal::<Vulkan>(
-                        buf,
-                        &BufferDescriptor {
-                            label: None,
-                            size,
-                            usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
-                            mapped_at_creation: false,
-                        },
-                    );
-                    buffers.push(VulkanBuffer {
+                let oidn_buffer = oidn::sys::oidnNewSharedBufferFromWin32Handle(
+                    self.oidn_device.raw(),
+                    OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32,
+                    handle as *mut _,
+                    ptr::null(),
+                    size as usize,
+                );
+                if oidn_buffer.is_null() {
+                    eprintln!("Failed to create oidn buffer", );
+                    eprintln!("error: {:?}", self.oidn_device.get_error());
+                    return Err(None);
+                }
+                let buf = vulkan::Device::buffer_from_raw(raw_buffer);
+                let mut encoder = self.wgpu_device.create_command_encoder(&Default::default());
+                encoder.as_hal_mut::<Vulkan, _, _>(|encoder| {
+                    encoder.unwrap().clear_buffer(&buf, 0..size);
+                });
+                self.queue.submit([encoder.finish()]);
+                let wgpu_buffer = self.wgpu_device.create_buffer_from_hal::<Vulkan>(
+                    buf,
+                    &BufferDescriptor {
+                        label: None,
+                        size,
+                        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
+                        mapped_at_creation: false,
+                    },
+                );
+                Ok(crate::SharedBuffer {
+                    _allocation: crate::Allocation::Vulkan {
+                        _vulkan: VulkanAllocation {
                         memory,
                         wgpu_device: self.wgpu_device.clone(),
-                        wgpu_buffer,
-                        oidn_buffer: self.oidn_device.create_buffer_from_raw(oidn_buffer),
-                    })
-                }
-                Ok(())
-            })?
+                    }
+                },
+                    wgpu_buffer,
+                    oidn_buffer: self.oidn_device.create_buffer_from_raw(oidn_buffer),
+                })
+            })
         }
-        Ok(buffers)
-    }
-    pub fn oidn_device(&self) -> &oidn::Device {
-        &self.oidn_device
-    }
-
-    pub fn wgpu_device(&self) -> &wgpu::Device {
-        &self.wgpu_device
-    }
-}
-
-impl VulkanBuffer {
-    pub fn oidn_buffer(&self) -> &oidn::Buffer {
-        &self.oidn_buffer
-    }
-    pub fn oidn_buffer_mut(&mut self) -> &mut oidn::Buffer {
-        &mut self.oidn_buffer
-    }
-    pub fn wgpu_buffer(&self) -> &wgpu::Buffer {
-        &self.wgpu_buffer
     }
 }
