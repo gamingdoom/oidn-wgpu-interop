@@ -92,6 +92,7 @@ impl crate::Device {
             return Err(None);
         }
 
+        // # SAFETY: the raw handle is not manually destroyed.
         unsafe {
             self.wgpu_device.as_hal::<Vulkan, _, _>(|device| {
                 let device = device.unwrap();
@@ -184,10 +185,13 @@ impl crate::Device {
                 }
                 let buf = vulkan::Device::buffer_from_raw(raw_buffer);
                 let mut encoder = self.wgpu_device.create_command_encoder(&Default::default());
+                // # SAFETY: the raw handle is not manually destroyed.
                 encoder.as_hal_mut::<Vulkan, _, _>(|encoder| {
                     encoder.unwrap().clear_buffer(&buf, 0..size);
                 });
                 self.queue.submit([encoder.finish()]);
+                // # SAFETY: Just initialized buffer, created it from the same device and made with
+                // the manually mapped usages.
                 let wgpu_buffer = self.wgpu_device.create_buffer_from_hal::<Vulkan>(
                     buf,
                     &BufferDescriptor {

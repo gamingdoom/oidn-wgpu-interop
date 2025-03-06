@@ -67,6 +67,7 @@ impl crate::Device {
         if size == 0 {
             return Err(None);
         }
+        // # SAFETY: the raw handle is not manually destroyed.
         unsafe {
             self.wgpu_device.as_hal::<Dx12, _, _>(|device| {
                 let device = device.unwrap();
@@ -147,11 +148,14 @@ impl crate::Device {
                     return Err(None);
                 }
                 let buf = dx12::Device::buffer_from_raw(resource, size);
+                // # SAFETY: the raw handle is not manually destroyed.
                 let mut encoder = self.wgpu_device.create_command_encoder(&Default::default());
                 encoder.as_hal_mut::<Dx12, _, _>(|encoder| {
                     encoder.unwrap().clear_buffer(&buf, 0..size);
                 });
                 self.queue.submit([encoder.finish()]);
+                // # SAFETY: Just initialized buffer, created it from the same device and made with
+                // the manually mapped usages.
                 let wgpu_buffer = self.wgpu_device.create_buffer_from_hal::<Dx12>(
                     buf,
                     &BufferDescriptor {
