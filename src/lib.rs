@@ -130,7 +130,7 @@ impl Device {
         let (wgpu_device, queue) = adapter
             .request_device(desc, trace_path)
             .await
-            .map_err(|err| crate::DeviceCreateError::RequestDeviceError(err))?;
+            .map_err(crate::DeviceCreateError::RequestDeviceError)?;
         Ok((
             Self {
                 wgpu_device,
