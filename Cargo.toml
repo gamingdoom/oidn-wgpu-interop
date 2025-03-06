@@ -6,6 +6,7 @@ license-file = "LICENSE"
 description = "An inteoperability layer between wgpu and oidn"
 keywords = ["interoperability", "compatability", "oidn", "wgpu"]
 repository = "https://github.com/Vecvec/oidn-wgpu-interop"
+exclude = [".cargo/*"]
 
 [dependencies]
 oidn = "2.3.2"
