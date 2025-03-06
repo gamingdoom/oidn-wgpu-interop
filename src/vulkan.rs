@@ -64,8 +64,20 @@ impl crate::Device {
         if device.is_null() {
             return Err(crate::DeviceCreateError::OidnUnsupported);
         }
-        let oidn_device = unsafe {
+        let supported_memory_types = unsafe {
             oidn::sys::oidnCommitDevice(device);
+            oidn::sys::oidnGetDeviceInt(device, b"externalMemoryTypes\0" as *const _ as _)
+        } as i32;
+        if supported_memory_types
+            & OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32 as i32
+            == 0
+        {
+            unsafe {
+                oidn::sys::oidnReleaseDevice(device);
+            }
+            return Err(crate::DeviceCreateError::OidnImportUnsupported);
+        }
+        let oidn_device = unsafe {
             oidn::Device::from_raw(device)
         };
         let (wgpu_device, queue) = adapter

@@ -6,6 +6,7 @@ pub mod vulkan;
 pub enum DeviceCreateError {
     RequestDeviceError(wgpu::RequestDeviceError),
     OidnUnsupported,
+    OidnImportUnsupported,
     MissingFeature,
     UnsupportedBackend(wgpu::Backend),
 }
@@ -17,6 +18,9 @@ impl Debug for DeviceCreateError {
             DeviceCreateError::OidnUnsupported => f.write_str(
                 "OIDN could not create a device for this Adapter (does this adapter support OIDN?)",
             ),
+            DeviceCreateError::OidnImportUnsupported => {
+                f.write_str("OIDN does not support the required import method")
+            }
             DeviceCreateError::MissingFeature => f.write_str("A required feature is missing"),
             DeviceCreateError::UnsupportedBackend(backend) => {
                 f.write_str("The backend ")?;
@@ -135,6 +139,8 @@ async fn test() {
         assert_eq!(bufs.oidn_buffer_mut().read()[0], 1.0);
         let mut filter = oidn::RayTracing::new(device.oidn_device());
         filter.image_dimensions(1, 1);
-        filter.filter_in_place_buffer(&mut bufs.oidn_buffer_mut()).unwrap();
+        filter
+            .filter_in_place_buffer(&mut bufs.oidn_buffer_mut())
+            .unwrap();
     }
 }
