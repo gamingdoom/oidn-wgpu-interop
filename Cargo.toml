@@ -2,6 +2,10 @@
 name = "oidn-wgpu-interop"
 version = "0.1.0"
 edition = "2024"
+license-file = "LICENSE"
+description = "An inteoperability layer between wgpu and oidn"
+keywords = ["interoperability", "compatability", "oidn", "wgpu"]
+repository = "https://github.com/Vecvec/oidn-wgpu-interop"
 
 [dependencies]
 oidn = "2.3.2"
