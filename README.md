@@ -5,9 +5,9 @@
 A helper library to create shared buffers between oidn and 
 wgpu.
 
-### Getting started
+## Getting started
 
-#### Creating the device
+### Creating the device
 
 Simply replace the `adapter.request_device` call with 
 `oidn_wgpu_interop::Device::new` (using 
@@ -15,7 +15,7 @@ Simply replace the `adapter.request_device` call with
 then able to call `device.wgpu_device` to get the created
 wgpu device and `device.oidn_device` to get the oidn device.
 
-#### Creating shared buffers
+### Creating shared buffers
 
 To create a shared buffer call 
 `device.allocate_shared_buffers`. The shared buffer may be
@@ -24,4 +24,11 @@ used with usages
 the wgpu buffer call `buffer.wgpu_buffer` and to get the 
 oidn buffer call `buffer.oidn_buffer`. It is recommended to
 minimise the number of shared buffers that exist at a given
-time due to them requiring a separate allocation.
+time due to them each requiring a separate allocation.
+
+## Platform Support
+
+Currently, this only supports DirectX12 and Vulkan (on 
+Windows using `VK_KHR_external_memory_win32`). This can be
+expanded to Vulkan (on Linux using 
+`VK_KHR_external_memory_fd`) and Metal.
