@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Write};
+use std::fmt::Debug;
 
 pub mod dx12;
 pub mod vulkan;
@@ -51,9 +51,7 @@ impl Debug for SharedBufferCreateError {
                 f.write_str(": ")?;
                 desc.fmt(f)
             }
-            SharedBufferCreateError::OutOfMemory => {
-                f.write_str("Out of memory")
-            }
+            SharedBufferCreateError::OutOfMemory => f.write_str("Out of memory"),
         }
     }
 }

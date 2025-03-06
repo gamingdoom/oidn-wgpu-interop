@@ -131,7 +131,9 @@ impl crate::Device {
                 if oidn_buffer.is_null() {
                     eprintln!("Failed to create oidn buffer");
                     eprintln!("error: {:?}", self.oidn_device.get_error());
-                    return Err(crate::SharedBufferCreateError::Oidn(self.oidn_device.get_error().unwrap_err()));
+                    return Err(crate::SharedBufferCreateError::Oidn(
+                        self.oidn_device.get_error().unwrap_err(),
+                    ));
                 }
                 let buf = dx12::Device::buffer_from_raw(resource, size);
                 // # SAFETY: the raw handle is not manually destroyed.
