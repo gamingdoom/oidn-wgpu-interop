@@ -93,7 +93,8 @@ impl crate::Device {
                 let vk_info = vk::BufferCreateInfo::default()
                     .size(size)
                     .usage(vk::BufferUsageFlags::TRANSFER_SRC | vk::BufferUsageFlags::TRANSFER_DST)
-                    .sharing_mode(vk::SharingMode::CONCURRENT);
+                    // technically exclusive because cross adapter doesn't matter here
+                    .sharing_mode(vk::SharingMode::EXCLUSIVE);
 
                 let raw_buffer = device
                     .raw_device()
