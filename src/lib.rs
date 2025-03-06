@@ -74,6 +74,46 @@ impl Device {
     pub fn wgpu_device(&self) -> &wgpu::Device {
         &self.wgpu_device
     }
+
+    async fn new_from_raw_oidn_adapter(
+        device: oidn::sys::OIDNDevice,
+        adapter: &wgpu::Adapter,
+        desc: &wgpu::DeviceDescriptor<'_>,
+        trace_path: Option<&std::path::Path>,
+        required_flags: oidn::sys::OIDNExternalMemoryTypeFlag,
+        backend: Backend,
+    ) -> Result<(Self, wgpu::Queue, i32), DeviceCreateError> {
+        if device.is_null() {
+            return Err(crate::DeviceCreateError::OidnUnsupported);
+        }
+
+        let supported_memory_types = unsafe {
+            oidn::sys::oidnCommitDevice(device);
+            oidn::sys::oidnGetDeviceInt(device, b"externalMemoryTypes\0" as *const _ as _)
+        } as i32;
+        let supported_flags = supported_memory_types & required_flags as i32;
+        if supported_flags == 0 {
+            unsafe {
+                oidn::sys::oidnReleaseDevice(device);
+            }
+            return Err(DeviceCreateError::OidnImportUnsupported);
+        }
+        let oidn_device = unsafe { oidn::Device::from_raw(device) };
+        let (wgpu_device, queue) = adapter
+            .request_device(desc, trace_path)
+            .await
+            .map_err(|err| crate::DeviceCreateError::RequestDeviceError(err))?;
+        Ok((
+            Self {
+                wgpu_device,
+                oidn_device,
+                queue: queue.clone(),
+                backend,
+            },
+            queue,
+            supported_flags,
+        ))
+    }
 }
 
 enum Allocation {
@@ -142,5 +182,9 @@ async fn test() {
         filter
             .filter_in_place_buffer(&mut bufs.oidn_buffer_mut())
             .unwrap();
+        match device.oidn_device().get_error() {
+            Ok(_) | Err((oidn::Error::OutOfMemory, _)) => {}
+            Err(err) => panic!("{err:?}"),
+        }
     }
 }

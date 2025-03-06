@@ -61,38 +61,16 @@ impl crate::Device {
         let device = unsafe {
             oidn::sys::oidnNewDeviceByUUID((&vk_desc.device_uuid) as *const _ as *const _)
         };
-        if device.is_null() {
-            return Err(crate::DeviceCreateError::OidnUnsupported);
-        }
-        let supported_memory_types = unsafe {
-            oidn::sys::oidnCommitDevice(device);
-            oidn::sys::oidnGetDeviceInt(device, b"externalMemoryTypes\0" as *const _ as _)
-        } as i32;
-        if supported_memory_types
-            & OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32 as i32
-            == 0
-        {
-            unsafe {
-                oidn::sys::oidnReleaseDevice(device);
-            }
-            return Err(crate::DeviceCreateError::OidnImportUnsupported);
-        }
-        let oidn_device = unsafe {
-            oidn::Device::from_raw(device)
-        };
-        let (wgpu_device, queue) = adapter
-            .request_device(desc, trace_path)
-            .await
-            .map_err(|err| crate::DeviceCreateError::RequestDeviceError(err))?;
-        Ok((
-            crate::Device {
-                wgpu_device,
-                oidn_device,
-                queue: queue.clone(),
-                backend: crate::Backend::Vulkan,
-            },
-            queue,
-        ))
+        Self::new_from_raw_oidn_adapter(
+            device,
+            adapter,
+            desc,
+            trace_path,
+            OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32,
+            crate::Backend::Vulkan,
+        )
+        .await
+        .map(|(device, queue, _)| (device, queue))
     }
     pub(crate) fn allocate_shared_buffers_vulkan(
         &self,
