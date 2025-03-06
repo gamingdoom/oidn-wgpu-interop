@@ -124,7 +124,7 @@ async fn test() {
                 }
             };
         let mut bufs = device
-            .allocate_shared_buffers(size_of::<[f32; 4]>() as wgpu::BufferAddress)
+            .allocate_shared_buffers(size_of::<[f32; 3]>() as wgpu::BufferAddress)
             .unwrap();
         queue.write_buffer(bufs.wgpu_buffer(), 0, &1.0_f32.to_ne_bytes());
         queue.submit([]);
@@ -133,5 +133,8 @@ async fn test() {
             .poll(wgpu::Maintain::Wait)
             .panic_on_timeout();
         assert_eq!(bufs.oidn_buffer_mut().read()[0], 1.0);
+        let mut filter = oidn::RayTracing::new(device.oidn_device());
+        filter.image_dimensions(1, 1);
+        filter.filter_in_place_buffer(&mut bufs.oidn_buffer_mut()).unwrap();
     }
 }
