@@ -50,12 +50,9 @@ impl crate::Device {
     pub(crate) fn allocate_shared_buffers_dx12(
         &self,
         size: wgpu::BufferAddress,
-    ) -> Result<crate::SharedBuffer, Option<()>> {
+    ) -> Result<crate::SharedBuffer, crate::SharedBufferCreateError> {
         assert_eq!(self.backend, crate::Backend::Dx12);
 
-        if size == 0 {
-            return Err(None);
-        }
         // # SAFETY: the raw handle is not manually destroyed.
         unsafe {
             self.wgpu_device.as_hal::<Dx12, _, _>(|device| {
@@ -83,7 +80,7 @@ impl crate::Device {
                     .CreateHeap(&heap_desc, &mut heap)
                     .map_err(|err| {
                         eprintln!("Failed to create heap: {}", err.message());
-                        None
+                        crate::SharedBufferCreateError::OutOfMemory
                     })?;
                 let heap: ID3D12Heap = heap.unwrap();
                 let desc = D3D12_RESOURCE_DESC {
@@ -114,7 +111,7 @@ impl crate::Device {
                     )
                     .map_err(|err| {
                         eprintln!("Failed to create resource: {}", err.message());
-                        None
+                        crate::SharedBufferCreateError::OutOfMemory
                     })?;
                 let resource = resource.unwrap();
                 let handle = device
@@ -122,7 +119,7 @@ impl crate::Device {
                     .CreateSharedHandle(&heap, None, GENERIC_ALL.0, None)
                     .map_err(|err| {
                         eprintln!("Failed to create shared handle: {}", err.message());
-                        None
+                        crate::SharedBufferCreateError::OutOfMemory
                     })?;
                 let oidn_buffer = oidn::sys::oidnNewSharedBufferFromWin32Handle(
                     self.oidn_device.raw(),
@@ -134,7 +131,7 @@ impl crate::Device {
                 if oidn_buffer.is_null() {
                     eprintln!("Failed to create oidn buffer");
                     eprintln!("error: {:?}", self.oidn_device.get_error());
-                    return Err(None);
+                    return Err(crate::SharedBufferCreateError::Oidn(self.oidn_device.get_error().unwrap_err()));
                 }
                 let buf = dx12::Device::buffer_from_raw(resource, size);
                 // # SAFETY: the raw handle is not manually destroyed.

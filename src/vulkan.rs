@@ -75,12 +75,8 @@ impl crate::Device {
     pub(crate) fn allocate_shared_buffers_vulkan(
         &self,
         size: wgpu::BufferAddress,
-    ) -> Result<crate::SharedBuffer, Option<()>> {
+    ) -> Result<crate::SharedBuffer, crate::SharedBufferCreateError> {
         assert_eq!(self.backend, crate::Backend::Vulkan);
-
-        if size == 0 {
-            return Err(None);
-        }
 
         // # SAFETY: the raw handle is not manually destroyed.
         unsafe {
@@ -99,7 +95,7 @@ impl crate::Device {
                 let raw_buffer = device
                     .raw_device()
                     .create_buffer(&vk_info, None)
-                    .map_err(|_| None)?;
+                    .map_err(|_| crate::SharedBufferCreateError::OutOfMemory)?;
 
                 let req = device
                     .raw_device()
@@ -127,7 +123,7 @@ impl crate::Device {
                 }
 
                 let Some(idx) = idx else {
-                    return Err(None);
+                    return Err(crate::SharedBufferCreateError::OutOfMemory);
                 };
 
                 let mut info = vk::MemoryAllocateInfo::default()
@@ -146,13 +142,13 @@ impl crate::Device {
 
                 let memory = match device.raw_device().allocate_memory(&info, None) {
                     Ok(memory) => memory,
-                    Err(_) => return Err(None),
+                    Err(_) => return Err(crate::SharedBufferCreateError::OutOfMemory),
                 };
 
                 device
                     .raw_device()
                     .bind_buffer_memory(raw_buffer, memory, 0)
-                    .map_err(|_| None)?;
+                    .map_err(|_| crate::SharedBufferCreateError::OutOfMemory)?;
 
                 let handle = win_32_funcs
                     .get_memory_win32_handle(
@@ -160,7 +156,7 @@ impl crate::Device {
                             .memory(memory)
                             .handle_type(vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32_KHR),
                     )
-                    .map_err(|_| None)?;
+                    .map_err(|_| crate::SharedBufferCreateError::OutOfMemory)?;
 
                 let oidn_buffer = oidn::sys::oidnNewSharedBufferFromWin32Handle(
                     self.oidn_device.raw(),
@@ -170,9 +166,9 @@ impl crate::Device {
                     size as usize,
                 );
                 if oidn_buffer.is_null() {
-                    eprintln!("Failed to create oidn buffer",);
-                    eprintln!("error: {:?}", self.oidn_device.get_error());
-                    return Err(None);
+                    return Err(crate::SharedBufferCreateError::Oidn(
+                        self.oidn_device.get_error().unwrap_err(),
+                    ));
                 }
                 let buf = vulkan::Device::buffer_from_raw(raw_buffer);
                 let mut encoder = self.wgpu_device.create_command_encoder(&Default::default());

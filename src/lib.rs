@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Write};
 
 pub mod dx12;
 pub mod vulkan;
@@ -26,6 +26,33 @@ impl Debug for DeviceCreateError {
                 f.write_str("The backend ")?;
                 backend.fmt(f)?;
                 f.write_str(" is not supported.")
+            }
+        }
+    }
+}
+
+pub enum SharedBufferCreateError {
+    InvalidSize(wgpu::BufferAddress),
+    Oidn((oidn::Error, String)),
+    OutOfMemory,
+}
+
+impl Debug for SharedBufferCreateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            SharedBufferCreateError::InvalidSize(size) => {
+                f.write_str("Size ")?;
+                size.fmt(f)?;
+                f.write_str(" is not allowed")
+            }
+            SharedBufferCreateError::Oidn((error, desc)) => {
+                f.write_str("OIDN shared buffer creation failed with error ")?;
+                error.fmt(f)?;
+                f.write_str(": ")?;
+                desc.fmt(f)
+            }
+            SharedBufferCreateError::OutOfMemory => {
+                f.write_str("Out of memory")
             }
         }
     }
@@ -61,7 +88,10 @@ impl Device {
     pub fn allocate_shared_buffers(
         &self,
         size: wgpu::BufferAddress,
-    ) -> Result<SharedBuffer, Option<()>> {
+    ) -> Result<SharedBuffer, SharedBufferCreateError> {
+        if size == 0 {
+            return Err(SharedBufferCreateError::InvalidSize(size));
+        }
         match self.backend {
             Backend::Dx12 => self.allocate_shared_buffers_dx12(size),
             Backend::Vulkan => self.allocate_shared_buffers_vulkan(size),
