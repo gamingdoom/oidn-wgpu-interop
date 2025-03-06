@@ -86,11 +86,16 @@ impl crate::Device {
                     device.shared_instance().raw_instance(),
                     device.raw_device(),
                 );
+
+                let mut vk_external_memory_info = vk::ExternalMemoryBufferCreateInfo::default()
+                    .handle_types(vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32_KHR);
+
                 let vk_info = vk::BufferCreateInfo::default()
                     .size(size)
                     .usage(vk::BufferUsageFlags::TRANSFER_SRC | vk::BufferUsageFlags::TRANSFER_DST)
                     // technically exclusive because cross adapter doesn't matter here
-                    .sharing_mode(vk::SharingMode::EXCLUSIVE);
+                    .sharing_mode(vk::SharingMode::EXCLUSIVE)
+                    .push_next(&mut vk_external_memory_info);
 
                 let raw_buffer = device
                     .raw_device()
