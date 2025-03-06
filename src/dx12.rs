@@ -53,13 +53,13 @@ impl crate::Device {
             }
             return Err(crate::DeviceCreateError::OidnImportUnsupported);
         }
+        let oidn_device = unsafe {
+            oidn::Device::from_raw(device)
+        };
         let (wgpu_device, queue) = adapter
             .request_device(desc, trace_path)
             .await
             .map_err(|err| crate::DeviceCreateError::RequestDeviceError(err))?;
-        let oidn_device = unsafe {
-            oidn::Device::from_raw(device)
-        };
         Ok((
             crate::Device {
                 wgpu_device,
