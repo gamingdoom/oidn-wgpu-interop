@@ -113,7 +113,7 @@ impl crate::Device {
                     .raw_device()
                     .get_buffer_memory_requirements(raw_buffer);
 
-                let size = align_to(size, req.alignment);
+                let aligned_size = align_to(size, req.alignment);
 
                 let mem_properties = device
                     .shared_instance()
@@ -139,7 +139,7 @@ impl crate::Device {
                 };
 
                 let mut info = vk::MemoryAllocateInfo::default()
-                    .allocation_size(size)
+                    .allocation_size(aligned_size)
                     .memory_type_index(idx as u32);
 
                 let mut export_alloc_info = vk::ExportMemoryAllocateInfo::default()
