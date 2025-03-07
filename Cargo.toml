@@ -8,6 +8,10 @@ keywords = ["interoperability", "compatability", "oidn", "wgpu"]
 repository = "https://github.com/Vecvec/oidn-wgpu-interop"
 exclude = [".cargo/*"]
 
+[package.metadata.docs.rs]
+all-features = true
+targets = ["x86_64-pc-windows-msvc"]
+
 [dependencies]
 oidn = "2.3.2"
 wgpu = "24.0.1"
