@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
-pub mod dx12;
-pub mod vulkan;
+mod dx12;
+mod vulkan;
 
 pub enum DeviceCreateError {
     RequestDeviceError(wgpu::RequestDeviceError),
