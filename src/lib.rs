@@ -1,6 +1,8 @@
 use std::fmt::Debug;
 
+#[cfg(dx12)]
 mod dx12;
+#[cfg(vulkan)]
 mod vulkan;
 
 pub enum DeviceCreateError {
@@ -58,7 +60,9 @@ impl Debug for SharedBufferCreateError {
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 enum Backend {
+    #[cfg(dx12)]
     Dx12,
+    #[cfg(vulkan)]
     Vulkan,
 }
 
@@ -76,7 +80,9 @@ impl Device {
         trace_path: Option<&std::path::Path>,
     ) -> Result<(Self, wgpu::Queue), DeviceCreateError> {
         match adapter.get_info().backend {
+            #[cfg(vulkan)]
             wgpu::Backend::Vulkan => Self::new_vulkan(adapter, desc, trace_path).await,
+            #[cfg(dx12)]
             wgpu::Backend::Dx12 => Self::new_dx12(adapter, desc, trace_path).await,
             _ => Err(DeviceCreateError::UnsupportedBackend(
                 adapter.get_info().backend,
@@ -91,7 +97,9 @@ impl Device {
             return Err(SharedBufferCreateError::InvalidSize(size));
         }
         match self.backend {
+            #[cfg(dx12)]
             Backend::Dx12 => self.allocate_shared_buffers_dx12(size),
+            #[cfg(vulkan)]
             Backend::Vulkan => self.allocate_shared_buffers_vulkan(size),
         }
     }
@@ -146,7 +154,9 @@ impl Device {
 
 enum Allocation {
     // we keep these around to keep the allocations alive
+    #[cfg(dx12)]
     Dx12 { _dx12: dx12::Dx12Allocation },
+    #[cfg(vulkan)]
     Vulkan { _vulkan: vulkan::VulkanAllocation },
 }
 

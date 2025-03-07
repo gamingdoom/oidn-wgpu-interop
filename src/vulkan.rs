@@ -5,7 +5,9 @@ use wgpu::hal::api::Vulkan;
 use wgpu::hal::{CommandEncoder, vulkan};
 use wgpu::util::align_to;
 use wgpu::{BufferDescriptor, BufferUsages, DeviceDescriptor};
-use windows::Win32::Foundation::GENERIC_ALL;
+
+// We can't rely on the windows crate existing here and this may also be either a u32 or u64.
+const ACCESS_GENERIC_ALL: vk::DWORD = 268435456;
 
 pub(crate) struct VulkanAllocation {
     memory: vk::DeviceMemory,
@@ -139,7 +141,7 @@ impl crate::Device {
                     .handle_types(vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32_KHR);
 
                 let mut win32_info =
-                    vk::ExportMemoryWin32HandleInfoKHR::default().dw_access(GENERIC_ALL.0);
+                    vk::ExportMemoryWin32HandleInfoKHR::default().dw_access(ACCESS_GENERIC_ALL);
 
                 info = info
                     .push_next(&mut win32_info)

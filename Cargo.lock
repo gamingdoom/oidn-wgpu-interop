@@ -759,12 +759,14 @@ dependencies = [
 
 [[package]]
 name = "oidn-wgpu-interop"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ash",
  "async-std",
+ "cfg_aliases",
  "oidn",
  "wgpu",
+ "wgpu-hal",
  "windows",
 ]
 
