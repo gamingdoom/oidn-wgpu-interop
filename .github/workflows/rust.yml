@@ -43,7 +43,9 @@ jobs:
       - name: Copy libs
         run: cp -r oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}/lib/ ./
       - run: echo "OIDN_DIR=`pwd`/oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}" >> $GITHUB_ENV
-      - run: echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${OIDN_DIR}/lib" >> $GITHUB_ENV
+      - name: Set LD_LIBRARY_PATH
+        if: matrix.os == 'x86_64-unknown-linux-gnu'
+        run: echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${OIDN_DIR}/lib" >> $GITHUB_ENV
       - name: Clippy default features
         run: cargo clippy
       - name: Clippy all features
