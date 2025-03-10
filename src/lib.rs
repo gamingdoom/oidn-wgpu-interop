@@ -66,11 +66,29 @@ enum Backend {
     Vulkan,
 }
 
+enum BackendData {
+    #[cfg(dx12)]
+    Dx12,
+    #[cfg(vulkan)]
+    Vulkan(vulkan::VulkanSharingMode),
+}
+
+impl BackendData {
+    fn as_backend(&self) -> Backend {
+        match self {
+            #[cfg(dx12)]
+            BackendData::Dx12 => Backend::Dx12,
+            #[cfg(vulkan)]
+            BackendData::Vulkan(_) => Backend::Vulkan,
+        }
+    }
+}
+
 pub struct Device {
     wgpu_device: wgpu::Device,
     oidn_device: oidn::Device,
     queue: wgpu::Queue,
-    backend: Backend,
+    backend_data: BackendData,
 }
 
 impl Device {
@@ -96,7 +114,7 @@ impl Device {
         if size == 0 {
             return Err(SharedBufferCreateError::InvalidSize(size));
         }
-        match self.backend {
+        match self.backend_data.as_backend() {
             #[cfg(dx12)]
             Backend::Dx12 => self.allocate_shared_buffers_dx12(size),
             #[cfg(vulkan)]
@@ -117,7 +135,7 @@ impl Device {
         desc: &wgpu::DeviceDescriptor<'_>,
         trace_path: Option<&std::path::Path>,
         required_flags: oidn::sys::OIDNExternalMemoryTypeFlag,
-        backend: Backend,
+        backend_data: BackendData,
     ) -> Result<(Self, wgpu::Queue, i32), DeviceCreateError> {
         if device.is_null() {
             return Err(crate::DeviceCreateError::OidnUnsupported);
@@ -144,7 +162,7 @@ impl Device {
                 wgpu_device,
                 oidn_device,
                 queue: queue.clone(),
-                backend,
+                backend_data,
             },
             queue,
             supported_flags,

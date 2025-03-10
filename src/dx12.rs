@@ -42,7 +42,7 @@ impl crate::Device {
             desc,
             trace_path,
             OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32,
-            crate::Backend::Dx12,
+            crate::BackendData::Dx12,
         )
         .await
         .map(|(device, queue, _)| (device, queue))
@@ -51,7 +51,7 @@ impl crate::Device {
         &self,
         size: wgpu::BufferAddress,
     ) -> Result<crate::SharedBuffer, crate::SharedBufferCreateError> {
-        assert_eq!(self.backend, crate::Backend::Dx12);
+        debug_assert_eq!(self.backend_data.as_backend(), crate::Backend::Dx12);
 
         // # SAFETY: the raw handle is not manually destroyed.
         unsafe {
