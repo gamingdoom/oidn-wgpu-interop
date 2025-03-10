@@ -1,0 +1,54 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  OIDN_VERSION: "2.3.2"
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-2022
+            target: x86_64-pc-windows-msvc
+            oidn_ty: "x64.windows"
+            oidn_ext: ".zip"
+          - name: Ubuntu
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            oidn_ty: "x86_64.linux"
+            oidn_ext: ".tar.gz"
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: wget
+        shell: bash
+        run: wget https://github.com/RenderKit/oidn/releases/download/v${{ env.OIDN_VERSION }}/oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}${{ matrix.oidn_ext }}
+      - name: Copy to target
+        shell: bash
+        run: cp oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}/bin/ target/debug/deps/
+      - name: Copy libs
+        run: cp oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}/lib/ ./
+      - name: Write cargo.toml
+        shell: bash
+        run:
+          mkdir -p .cargo
+          
+          cat <<EOF >> .cargo/config.toml
+          [env]
+          OIDN_DIR = "./oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}"
+          EOF
+      - name: Clippy default features
+        run: cargo clippy
+      - name: Clippy all features
+        run: cargo clippy --all-features
