@@ -56,8 +56,8 @@ jobs:
           mkdir -p .cargo
           
           cat <<EOF >> .cargo/config.toml
-          [env]
-          OIDN_DIR = "./oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}"
+            [env]
+            OIDN_DIR = "./oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}"
           EOF
       - name: Clippy default features
         run: cargo clippy
