@@ -42,7 +42,12 @@ jobs:
         run: tar -xf oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}${{ matrix.oidn_ext }}
       - name: Copy to target
         shell: bash
-        run: cp -r oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}/${{ matrix.copy_src }}/ target/debug/deps/
+        run:
+          mkdir -p target
+          mkdir -p target/debug
+          mkdir -p target/debug/deps
+          
+          cp -r oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}/${{ matrix.copy_src }}/ target/debug/deps/
       - name: Copy libs
         run: cp -r oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}/lib/ ./
       - name: Write cargo.toml
