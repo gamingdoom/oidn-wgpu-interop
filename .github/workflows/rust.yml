@@ -48,11 +48,11 @@ jobs:
         run: echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${OIDN_DIR}/lib" >> $GITHUB_ENV
       - name: Clippy default features
         run:
-          $env:OIDN_DIR=${OIDN_DIR}
+          $env:OIDN_DIR="${OIDN_DIR}"
           cargo clippy
       - name: Clippy all features
         run:
-          $env:OIDN_DIR=${OIDN_DIR}
+          $env:OIDN_DIR="${OIDN_DIR}"
           cargo clippy --all-features
       - name: Format
         run: cargo fmt -- --check
