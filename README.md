@@ -1,5 +1,8 @@
 # OIDN wgpu interoperability
 
+
+[![Crates.io](https://img.shields.io/crates/v/oidn-wgpu-interop.svg)](https://crates.io/crates/oidn-wgpu-interop)
+[![CI](https://github.com/Vecvec/oidn-wgpu-interop/actions/workflows/ci.yml/badge.svg)](https://github.com/Vecvec/oidn-wgpu-interop/actions/workflows/ci.yml)
 ---
 
 A helper library to create shared buffers between OIDN and
