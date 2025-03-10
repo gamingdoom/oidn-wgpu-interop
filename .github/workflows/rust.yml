@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Download oidn
         shell: bash
-        run: ${{ matrix.curl }} -L --retry 3 https://github.com/RenderKit/oidn/releases/download/v${{ env.OIDN_VERSION }}/oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}${{ matrix.oidn_ext }}
+        run: ${{ matrix.curl }} -L --retry 3 https://github.com/RenderKit/oidn/releases/download/v${{ env.OIDN_VERSION }}/oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}${{ matrix.oidn_ext }} -o oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}${{ matrix.oidn_ext }}
       - name: Unwrap oidn
         run: tar -xf oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}${{ matrix.oidn_ext }}
       - name: Copy to target
