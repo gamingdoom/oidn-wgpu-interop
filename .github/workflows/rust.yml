@@ -9,7 +9,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
   OIDN_VERSION: "2.3.2"
-  OIDN_DIR: "./oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}"
 
 jobs:
   test:
@@ -51,6 +50,10 @@ jobs:
           cp -r oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}/${{ matrix.copy_src }}/ target/debug/deps/
       - name: Copy libs
         run: cp -r oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}/lib/ ./
+      - name: Set environment variable
+        shell: bash
+        run:
+          echo "OIDN_DIR = \"./oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}\"" >> "$GITHUB_ENV"
       - name: Clippy default features
         run: cargo clippy
       - name: Clippy all features
