@@ -47,11 +47,11 @@ jobs:
         if: matrix.os == 'x86_64-unknown-linux-gnu'
         run: echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${OIDN_DIR}/lib" >> $GITHUB_ENV
       - name: Clippy default features
-        run:
+        run: |
           $env:OIDN_DIR="${OIDN_DIR}"
           cargo clippy
       - name: Clippy all features
-        run:
+        run: |
           $env:OIDN_DIR="${OIDN_DIR}"
           cargo clippy --all-features
       - name: Format
