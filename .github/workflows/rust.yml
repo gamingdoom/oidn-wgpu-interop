@@ -42,12 +42,12 @@ jobs:
         run: tar -xf oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}${{ matrix.oidn_ext }}
       - name: Copy libs
         run: cp -r oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}/lib/ ./
-      - name: Set environment variable
+      - name: Set OIDN_DIR
         shell: bash
-        run:
-          echo "OIDN_DIR =`pwd`/oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}" >> $GITHUB_ENV
-          
-          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${OIDN_DIR}/lib" >> $GITHUB_ENV
+        run: echo "OIDN_DIR =`pwd`/oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}" >> $GITHUB_ENV
+      - name: Set OIDN_DIR
+        shell: bash
+        run: echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${OIDN_DIR}/lib" >> $GITHUB_ENV
       - name: Clippy default features
         run: cargo clippy
       - name: Clippy all features
