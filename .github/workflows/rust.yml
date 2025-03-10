@@ -44,15 +44,23 @@ jobs:
         run: cp -r oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}/lib/ ./
       - run: echo "OIDN_DIR=`pwd`/oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}" >> $GITHUB_ENV
       - name: Set LD_LIBRARY_PATH
-        if: matrix.os == 'x86_64-unknown-linux-gnu'
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${OIDN_DIR}/lib" >> $GITHUB_ENV
-      - name: Clippy default features
+      - name: Clippy default features (windows)
+        if: matrix.target == 'x86_64-pc-windows-msvc'
         run: |
-          $env:OIDN_DIR="${OIDN_DIR}"
+          $env:OIDN_DIR="${OIDN_DIR}/"
           cargo clippy
-      - name: Clippy all features
+      - name: Clippy all features (windows)
+        if: matrix.target == 'x86_64-pc-windows-msvc'
         run: |
-          $env:OIDN_DIR="${OIDN_DIR}"
+          $env:OIDN_DIR="${OIDN_DIR}/"
           cargo clippy --all-features
+      - name: Clippy default features (linux)
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: cargo clippy
+      - name: Clippy all features (linux)
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: cargo clippy --all-features
       - name: Format
         run: cargo fmt -- --check
