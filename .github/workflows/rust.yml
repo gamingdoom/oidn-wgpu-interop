@@ -21,22 +21,28 @@ jobs:
             target: x86_64-pc-windows-msvc
             oidn_ty: "x64.windows"
             oidn_ext: ".zip"
+            curl: "curl.exe"
+            copy_src: "bin"
           - name: Ubuntu
             os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             oidn_ty: "x86_64.linux"
             oidn_ext: ".tar.gz"
+            curl: "curl"
+            copy_src: "lib"
 
     runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
-      - name: wget
+      - name: Download oidn
         shell: bash
-        run: wget https://github.com/RenderKit/oidn/releases/download/v${{ env.OIDN_VERSION }}/oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}${{ matrix.oidn_ext }}
+        run: ${{ matrix.curl }} -L --retry 3 https://github.com/RenderKit/oidn/releases/download/v${{ env.OIDN_VERSION }}/oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}${{ matrix.oidn_ext }}
+      - name: Unwrap oidn
+        run: tar -xf oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}${{ matrix.oidn_ext }}
       - name: Copy to target
         shell: bash
-        run: cp oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}/bin/ target/debug/deps/
+        run: cp oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}/${{ matrix.copy_src }}/ target/debug/deps/
       - name: Copy libs
         run: cp oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}/lib/ ./
       - name: Write cargo.toml
