@@ -40,20 +40,13 @@ jobs:
         run: ${{ matrix.curl }} -L --retry 3 https://github.com/RenderKit/oidn/releases/download/v${{ env.OIDN_VERSION }}/oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}${{ matrix.oidn_ext }} -o oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}${{ matrix.oidn_ext }}
       - name: Unwrap oidn
         run: tar -xf oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}${{ matrix.oidn_ext }}
-      - name: Copy to target
-        shell: bash
-        run:
-          mkdir -p target
-          mkdir -p target/debug
-          mkdir -p target/debug/deps
-          
-          cp -r oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}/${{ matrix.copy_src }}/ target/debug/deps/
       - name: Copy libs
         run: cp -r oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}/lib/ ./
       - name: Set environment variable
         shell: bash
         run:
           echo "OIDN_DIR =`pwd`/oidn-${{ env.OIDN_VERSION }}.${{ matrix.oidn_ty }}" >> $GITHUB_ENV
+          
           echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${OIDN_DIR}/lib" >> $GITHUB_ENV
       - name: Clippy default features
         run: cargo clippy
