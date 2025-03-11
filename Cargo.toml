@@ -14,7 +14,7 @@ targets = ["x86_64-pc-windows-msvc"]
 
 [dependencies]
 oidn = "2.3.2"
-wgpu = "24.0.1"
+wgpu = { git = "https://github.com/Vecvec/wgpu.git", branch = "external-memory"}
 wgpu-hal = "24.0.2"
 windows = "0.58.0"
 ash = "0.38.0"

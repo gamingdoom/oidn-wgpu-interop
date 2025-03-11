@@ -36,16 +36,11 @@ impl crate::Device {
         };
         let device =
             unsafe { oidn::sys::oidnNewDeviceByLUID((&dx_desc.AdapterLuid) as *const _ as _) };
-        Self::new_from_raw_oidn_adapter(
-            device,
-            adapter,
-            desc,
-            trace_path,
-            OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32,
-            crate::BackendData::Dx12,
-        )
+        Self::new_from_raw_oidn_adapter(device, adapter, desc, trace_path, |flag| {
+            (flag & OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32 != 0)
+                .then_some(crate::BackendData::Dx12)
+        })
         .await
-        .map(|(device, queue, _)| (device, queue))
     }
     pub(crate) fn allocate_shared_buffers_dx12(
         &self,

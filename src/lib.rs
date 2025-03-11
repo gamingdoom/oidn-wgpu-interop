@@ -129,14 +129,15 @@ impl Device {
         &self.wgpu_device
     }
 
-    async fn new_from_raw_oidn_adapter(
+    async fn new_from_raw_oidn_adapter<
+        F: FnOnce(oidn::sys::OIDNExternalMemoryTypeFlag) -> Option<BackendData>,
+    >(
         device: oidn::sys::OIDNDevice,
         adapter: &wgpu::Adapter,
         desc: &wgpu::DeviceDescriptor<'_>,
         trace_path: Option<&std::path::Path>,
-        required_flags: oidn::sys::OIDNExternalMemoryTypeFlag,
-        backend_data: BackendData,
-    ) -> Result<(Self, wgpu::Queue, i32), DeviceCreateError> {
+        backend_data_callback: F,
+    ) -> Result<(Self, wgpu::Queue), DeviceCreateError> {
         if device.is_null() {
             return Err(crate::DeviceCreateError::OidnUnsupported);
         }
@@ -144,14 +145,13 @@ impl Device {
         let supported_memory_types = unsafe {
             oidn::sys::oidnCommitDevice(device);
             oidn::sys::oidnGetDeviceInt(device, b"externalMemoryTypes\0" as *const _ as _)
-        } as i32;
-        let supported_flags = supported_memory_types & required_flags as i32;
-        if supported_flags == 0 {
+        } as oidn::sys::OIDNExternalMemoryTypeFlag;
+        let Some(backend_data) = backend_data_callback(supported_memory_types) else {
             unsafe {
                 oidn::sys::oidnReleaseDevice(device);
             }
             return Err(DeviceCreateError::OidnImportUnsupported);
-        }
+        };
         let oidn_device = unsafe { oidn::Device::from_raw(device) };
         let (wgpu_device, queue) = adapter
             .request_device(desc, trace_path)
@@ -165,7 +165,6 @@ impl Device {
                 backend_data,
             },
             queue,
-            supported_flags,
         ))
     }
 }
@@ -228,10 +227,7 @@ async fn test() {
             .unwrap();
         queue.write_buffer(bufs.wgpu_buffer(), 0, &1.0_f32.to_ne_bytes());
         queue.submit([]);
-        device
-            .wgpu_device()
-            .poll(wgpu::Maintain::Wait)
-            .panic_on_timeout();
+        device.wgpu_device().poll(wgpu::PollType::Wait).unwrap();
         assert_eq!(bufs.oidn_buffer_mut().read()[0], 1.0);
         let mut filter = oidn::RayTracing::new(device.oidn_device());
         filter.image_dimensions(1, 1);
