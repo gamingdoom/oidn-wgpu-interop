@@ -1,8 +1,8 @@
 use ash::{ext, khr, vk};
 use oidn::sys::{
     OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_DMA_BUF,
+    OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_FD,
     OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32,
-    OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_FD
 };
 
 use std::ptr;
@@ -64,7 +64,8 @@ impl crate::Device {
                                 .physical_device_capabilities()
                                 .supports_extension(khr::external_memory_fd::NAME);
 
-                        let any_supported = win_32_handle_supported || dma_buf_supported || fd_supported;
+                        let any_supported =
+                            win_32_handle_supported || dma_buf_supported || fd_supported;
 
                         // `get_physical_device_properties2` requires version >= 1.1
                         (any_supported
