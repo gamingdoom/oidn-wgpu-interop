@@ -1,9 +1,9 @@
-#[cfg(feature = "untested-features")]
-use ash::ext;
-use ash::{khr, vk};
-#[cfg(feature = "untested-features")]
-use oidn::sys::{OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_FD, OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_DMA_BUF};
-use oidn::sys::OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32;
+use ash::{ext, khr, vk};
+use oidn::sys::{
+    OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_DMA_BUF,
+    OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32,
+    OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_FD
+};
 
 use std::ptr;
 use wgpu::hal::api::Vulkan;
@@ -22,9 +22,7 @@ pub(crate) struct VulkanAllocation {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum VulkanSharingMode {
     Win32,
-    #[cfg(feature = "untested-features")]
     Fd,
-    #[cfg(feature = "untested-features")]
     Dma,
 }
 
@@ -46,9 +44,7 @@ impl crate::Device {
         trace_path: Option<&std::path::Path>,
     ) -> Result<(Self, wgpu::Queue), crate::DeviceCreateError> {
         let mut win_32_handle_supported = false;
-        #[cfg(feature = "untested-features")]
         let mut fd_supported = false;
-        #[cfg(feature = "untested-features")]
         let mut dma_buf_supported = false;
         // # SAFETY: the raw handle is not manually destroyed.
         let adapter_vulkan_desc = unsafe {
@@ -58,24 +54,18 @@ impl crate::Device {
                         win_32_handle_supported = adapter
                             .physical_device_capabilities()
                             .supports_extension(khr::external_memory_win32::NAME);
-                        #[cfg(feature = "untested-features")]
-                        {
-                            fd_supported = adapter
+                        fd_supported = adapter
+                            .physical_device_capabilities()
+                            .supports_extension(khr::external_memory_fd::NAME);
+                        dma_buf_supported = adapter
+                            .physical_device_capabilities()
+                            .supports_extension(ext::external_memory_dma_buf::NAME)
+                            && adapter
                                 .physical_device_capabilities()
                                 .supports_extension(khr::external_memory_fd::NAME);
-                            dma_buf_supported = adapter
-                                .physical_device_capabilities()
-                                .supports_extension(ext::external_memory_dma_buf::NAME);
-                        }
 
-                        #[cfg_attr(not(feature = "untested-features"), expect(unused_mut))]
-                        let mut any_supported = win_32_handle_supported;
+                        let any_supported = win_32_handle_supported || dma_buf_supported || fd_supported;
 
-                        #[cfg(feature = "untested-features")]
-                        {
-                            any_supported = any_supported || fd_supported;
-                            any_supported = any_supported || dma_buf_supported;
-                        }
                         // `get_physical_device_properties2` requires version >= 1.1
                         (any_supported
                             && adapter
@@ -106,37 +96,32 @@ impl crate::Device {
         let device = unsafe {
             oidn::sys::oidnNewDeviceByUUID((&vk_desc.device_uuid) as *const _ as *const _)
         };
-        Self::new_from_raw_oidn_adapter(
-            device,
-            adapter,
-            desc,
-            trace_path,
-            |flag| {
-                let oidn_supports_win32 = flag & OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32 != 0;
-                #[cfg(feature = "untested-features")]
-                let oidn_supports_fd = flag & OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_FD != 0;
-                #[cfg(feature = "untested-features")]
-                let oidn_supports_dma = flag & OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_DMA_BUF != 0;
-                if oidn_supports_win32 && win_32_handle_supported {
-                    return Some(crate::BackendData::Vulkan(VulkanSharingMode::Win32));
-                }
-                #[cfg(feature = "untested-features")]
-                if oidn_supports_fd && fd_supported {
-                    return Some(crate::BackendData::Vulkan(VulkanSharingMode::Fd));
-                }
-                #[cfg(feature = "untested-features")]
-                if oidn_supports_dma && dma_buf_supported {
-                    return Some(crate::BackendData::Vulkan(VulkanSharingMode::Dma));
-                }
-                None
-            },
-        )
+        Self::new_from_raw_oidn_adapter(device, adapter, desc, trace_path, |flag| {
+            let oidn_supports_win32 =
+                flag & OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32 != 0;
+            let oidn_supports_fd =
+                flag & OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_FD != 0;
+            let oidn_supports_dma =
+                flag & OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_DMA_BUF != 0;
+            if oidn_supports_win32 && win_32_handle_supported {
+                return Some(crate::BackendData::Vulkan(VulkanSharingMode::Win32));
+            }
+            if oidn_supports_fd && fd_supported {
+                return Some(crate::BackendData::Vulkan(VulkanSharingMode::Fd));
+            }
+            if oidn_supports_dma && dma_buf_supported {
+                return Some(crate::BackendData::Vulkan(VulkanSharingMode::Dma));
+            }
+            None
+        })
         .await
     }
     pub(crate) fn allocate_shared_buffers_vulkan(
         &self,
         size: wgpu::BufferAddress,
     ) -> Result<crate::SharedBuffer, crate::SharedBufferCreateError> {
+        // can happen if all other backends are switched off
+        #[allow(unreachable_patterns)]
         let data = match self.backend_data {
             crate::BackendData::Vulkan(data) => data,
             _ => unreachable!(),
@@ -147,11 +132,8 @@ impl crate::Device {
             self.wgpu_device.as_hal::<Vulkan, _, _>(|device| {
                 let device = device.unwrap();
 
-                // This assignment is used if `untested-features` is enabled
-                #[cfg_attr(not(feature = "untested-features"), expect(unused_assignments))]
                 let mut win_32_funcs = None;
 
-                #[cfg(feature = "untested-features")]
                 let mut fd_funcs = None;
 
                 let handle_ty = match data {
@@ -162,7 +144,6 @@ impl crate::Device {
                         ));
                         vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32_KHR
                     }
-                    #[cfg(feature = "untested-features")]
                     VulkanSharingMode::Fd => {
                         fd_funcs = Some(khr::external_memory_fd::Device::new(
                             device.shared_instance().raw_instance(),
@@ -170,7 +151,6 @@ impl crate::Device {
                         ));
                         vk::ExternalMemoryHandleTypeFlags::OPAQUE_FD_KHR
                     }
-                    #[cfg(feature = "untested-features")]
                     VulkanSharingMode::Dma => {
                         fd_funcs = Some(khr::external_memory_fd::Device::new(
                             device.shared_instance().raw_instance(),
@@ -239,10 +219,7 @@ impl crate::Device {
                             .dw_access(ACCESS_GENERIC_ALL);
                         info = info.push_next(&mut win32_info);
                     }
-                    #[cfg(feature = "untested-features")]
-                    VulkanSharingMode::Fd => {}
-                    #[cfg(feature = "untested-features")]
-                    VulkanSharingMode::Dma => {}
+                    VulkanSharingMode::Dma | VulkanSharingMode::Fd => {}
                 }
 
                 info = info.push_next(&mut export_alloc_info);
@@ -278,7 +255,6 @@ impl crate::Device {
                             size as usize,
                         )
                     }
-                    #[cfg(feature = "untested-features")]
                     VulkanSharingMode::Fd => {
                         let bit = fd_funcs
                             .as_ref()
@@ -296,7 +272,6 @@ impl crate::Device {
                             size as usize,
                         )
                     }
-                    #[cfg(feature = "untested-features")]
                     VulkanSharingMode::Dma => {
                         let bit = fd_funcs
                             .as_ref()

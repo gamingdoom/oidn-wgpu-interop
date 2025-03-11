@@ -32,7 +32,3 @@ default = ["dx12", "vulkan"]
 # affect this repository.
 dx12 = ["wgpu-hal/dx12"]
 vulkan = ["wgpu-hal/vulkan"]
-
-# UNTESTED: Do ***not*** enable if you are expecting
-# stabe execution, may hit validation errors ect.
-untested-features = []
