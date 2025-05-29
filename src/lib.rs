@@ -1,9 +1,9 @@
 use std::fmt::Debug;
 
 #[cfg(dx12)]
-pub mod dx12;
+mod dx12;
 #[cfg(vulkan)]
-pub mod vulkan;
+mod vulkan;
 
 pub enum DeviceCreateError {
     RequestDeviceError(wgpu::RequestDeviceError),
@@ -107,6 +107,24 @@ impl Device {
             )),
         }
     }
+
+    pub async fn new_from_dev(
+        adapter: &wgpu::Adapter,
+        dev: wgpu::Device,
+        queue: wgpu::Queue,
+        trace_path: Option<&std::path::Path>,
+    ) -> Result<(Self, wgpu::Queue), DeviceCreateError> {
+        match adapter.get_info().backend {
+            #[cfg(vulkan)]
+            wgpu::Backend::Vulkan => Self::from_vulkan_device(adapter, dev, queue, trace_path).await,
+            #[cfg(dx12)]
+            wgpu::Backend::Dx12 => unimplemented!(),
+            _ => Err(DeviceCreateError::UnsupportedBackend(
+                adapter.get_info().backend,
+            )),
+        }
+    }
+
     pub fn allocate_shared_buffers(
         &self,
         size: wgpu::BufferAddress,
