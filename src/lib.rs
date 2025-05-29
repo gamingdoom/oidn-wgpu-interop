@@ -167,6 +167,41 @@ impl Device {
             queue,
         ))
     }
+
+    async fn new_from_raw_oidn_device<
+        F: FnOnce(oidn::sys::OIDNExternalMemoryTypeFlag) -> Option<BackendData>,
+    >(
+        device: oidn::sys::OIDNDevice,
+        wgpu_device: wgpu::Device,
+        queue: wgpu::Queue,
+        backend_data_callback: F,
+    ) -> Result<(Self, wgpu::Queue), DeviceCreateError> {
+        if device.is_null() {
+            return Err(crate::DeviceCreateError::OidnUnsupported);
+        }
+
+        let supported_memory_types = unsafe {
+            oidn::sys::oidnCommitDevice(device);
+            oidn::sys::oidnGetDeviceInt(device, b"externalMemoryTypes\0" as *const _ as _)
+        } as oidn::sys::OIDNExternalMemoryTypeFlag;
+        let Some(backend_data) = backend_data_callback(supported_memory_types) else {
+            unsafe {
+                oidn::sys::oidnReleaseDevice(device);
+            }
+            return Err(DeviceCreateError::OidnImportUnsupported);
+        };
+        let oidn_device = unsafe { oidn::Device::from_raw(device) };
+
+        Ok((
+            Self {
+                wgpu_device,
+                oidn_device,
+                queue: queue.clone(),
+                backend_data,
+            },
+            queue,
+        ))
+    }
 }
 
 enum Allocation {

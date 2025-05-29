@@ -1,0 +1,51 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'wgpu-pathtracer'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=wgpu-pathtracer",
+                    "--package=wgpu-pathtracer"
+                ],
+                "filter": {
+                    "name": "wgpu-pathtracer",
+                    "kind": "bin"
+                },
+                "env": {
+                    "OIDN_DIR": ""
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'wgpu-pathtracer'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=wgpu-pathtracer",
+                    "--package=wgpu-pathtracer"
+                ],
+                "filter": {
+                    "name": "wgpu-pathtracer",
+                    "kind": "bin"
+                },
+                "env": {
+                    "OIDN_DIR": ""
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

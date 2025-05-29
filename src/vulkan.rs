@@ -117,6 +117,88 @@ impl crate::Device {
         })
         .await
     }
+
+    pub(crate) async fn from_vulkan_device(
+        adapter: &wgpu::Adapter,
+        wgpu_device: wgpu::Device,
+        queue: wgpu::Queue,
+        trace_path: Option<&std::path::Path>,
+    ) -> Result<(Self, wgpu::Queue), crate::DeviceCreateError> {
+        let mut win_32_handle_supported = false;
+        let mut fd_supported = false;
+        let mut dma_buf_supported = false;
+        let adapter_vulkan_desc = unsafe {
+            adapter.as_hal::<Vulkan, _, _>(|adapter| {
+                adapter
+                    .and_then(|adapter| {
+                        win_32_handle_supported = adapter
+                            .physical_device_capabilities()
+                            .supports_extension(khr::external_memory_win32::NAME);
+                        fd_supported = adapter
+                            .physical_device_capabilities()
+                            .supports_extension(khr::external_memory_fd::NAME);
+                        dma_buf_supported = adapter
+                            .physical_device_capabilities()
+                            .supports_extension(ext::external_memory_dma_buf::NAME)
+                            && adapter
+                                .physical_device_capabilities()
+                                .supports_extension(khr::external_memory_fd::NAME);
+
+                        let any_supported =
+                            win_32_handle_supported || dma_buf_supported || fd_supported;
+
+                        // `get_physical_device_properties2` requires version >= 1.1
+                        (any_supported
+                            && adapter
+                                .shared_instance()
+                                .raw_instance()
+                                .get_physical_device_properties(adapter.raw_physical_device())
+                                .api_version
+                                >= vk::API_VERSION_1_1)
+                            .then_some(adapter)
+                    })
+                    .map(|adapter| {
+                        let mut id_properties = vk::PhysicalDeviceIDProperties::default();
+                        adapter
+                            .shared_instance()
+                            .raw_instance()
+                            .get_physical_device_properties2(
+                                adapter.raw_physical_device(),
+                                &mut vk::PhysicalDeviceProperties2::default()
+                                    .push_next(&mut id_properties),
+                            );
+                        id_properties
+                    })
+            })
+        };
+        let Some(vk_desc) = adapter_vulkan_desc else {
+            return Err(crate::DeviceCreateError::MissingFeature);
+        };
+        let device = unsafe {
+            oidn::sys::oidnNewDeviceByUUID((&vk_desc.device_uuid) as *const _ as *const _)
+        };
+
+        Self::new_from_raw_oidn_device(device, wgpu_device, queue, |flag| {
+            let oidn_supports_win32 =
+                flag & OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32 != 0;
+            let oidn_supports_fd =
+                flag & OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_FD != 0;
+            let oidn_supports_dma =
+                flag & OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_DMA_BUF != 0;
+            if oidn_supports_win32 && win_32_handle_supported {
+                return Some(crate::BackendData::Vulkan(VulkanSharingMode::Win32));
+            }
+            if oidn_supports_fd && fd_supported {
+                return Some(crate::BackendData::Vulkan(VulkanSharingMode::Fd));
+            }
+            if oidn_supports_dma && dma_buf_supported {
+                return Some(crate::BackendData::Vulkan(VulkanSharingMode::Dma));
+            }
+            None
+        })
+        .await
+    }
+
     pub(crate) fn allocate_shared_buffers_vulkan(
         &self,
         size: wgpu::BufferAddress,
