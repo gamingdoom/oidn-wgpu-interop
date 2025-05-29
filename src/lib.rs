@@ -172,7 +172,7 @@ impl Device {
         };
         let oidn_device = unsafe { oidn::Device::from_raw(device) };
         let (wgpu_device, queue) = adapter
-            .request_device(desc, trace_path)
+            .request_device(desc)
             .await
             .map_err(crate::DeviceCreateError::RequestDeviceError)?;
         Ok((
