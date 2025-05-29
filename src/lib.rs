@@ -1,9 +1,9 @@
 use std::fmt::Debug;
 
 #[cfg(dx12)]
-mod dx12;
+pub mod dx12;
 #[cfg(vulkan)]
-mod vulkan;
+pub mod vulkan;
 
 pub enum DeviceCreateError {
     RequestDeviceError(wgpu::RequestDeviceError),
