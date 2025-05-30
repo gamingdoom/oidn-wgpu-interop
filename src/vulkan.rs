@@ -392,7 +392,7 @@ impl crate::Device {
                     &BufferDescriptor {
                         label: None,
                         size,
-                        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
+                        usage: BufferUsages::COPY_SRC | BufferUsages::COPY_DST | BufferUsages::STORAGE,
                         mapped_at_creation: false,
                     },
                 );
